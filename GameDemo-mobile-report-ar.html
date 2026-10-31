@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chickensoft GameDemo — نسخة الهاتف + الشبكة المحلية</title>
+<style>
+  :root{
+    --bg:#0b1016; --card:#121a24; --line:#1f2b39; --txt:#e8eef6; --muted:#93a4b8;
+    --ok:#3ddc97; --warn:#ffcc66; --bad:#ff6b6b; --accent:#4ea8ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b1016,#0d141d 60%,#0b1016);
+       color:var(--txt);font-family:"Segoe UI",Tahoma,"Noto Kufi Arabic",sans-serif;line-height:1.85}
+  .wrap{max-width:1000px;margin:0 auto;padding:34px 20px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:26px}
+  h1{font-size:30px;margin:0 0 8px}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);font-size:15px}
+  h2{font-size:22px;margin:38px 0 14px;padding-inline-start:12px;border-inline-start:4px solid var(--accent)}
+  h3{font-size:17px;margin:22px 0 8px;color:#cfe0f5}
+  p,li{font-size:16px}
+  code{background:#0d1620;border:1px solid var(--line);border-radius:6px;padding:1px 6px;
+       font-family:ui-monospace,Consolas,monospace;font-size:14px;direction:ltr;display:inline-block}
+  pre{background:#0d1620;border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+      overflow:auto;direction:ltr;text-align:left;font-size:13.5px;line-height:1.65}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:16px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .kpi b{display:block;font-size:26px;color:var(--ok);margin-bottom:2px}
+  .kpi small{color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:15px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:right;vertical-align:top}
+  th{background:#101a25;color:#cfe0f5;font-weight:600}
+  td.ok{color:var(--ok)}
+  td.no{color:var(--warn)}
+  .note{border-radius:12px;padding:14px 16px;margin:14px 0;border:1px solid}
+  .note.tip{background:rgba(61,220,151,.08);border-color:rgba(61,220,151,.35)}
+  .note.warn{background:rgba(255,204,102,.08);border-color:rgba(255,204,102,.35)}
+  .note.bad{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.35)}
+  ul,ol{padding-inline-start:22px}
+  .pill{display:inline-block;background:#132434;border:1px solid var(--line);border-radius:999px;
+        padding:3px 12px;font-size:13px;color:#bcd3ea;margin:2px}
+  footer{margin-top:46px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Chickensoft <span>GameDemo</span> — نسخة الهاتف + المبارزة عبر الشبكة المحلية</h1>
+  <div class="sub">بناء كامل من المصدر إلى ملف APK جاهز للتثبيت · محرك Godot 4.7.2 (.NET/C#) · تاريخ العمل: 31 أكتوبر 2026</div>
+  <div style="margin-top:10px">
+    <span class="pill">شاشة أفقية مقفلة</span>
+    <span class="pill">عصا تناظرية يسار</span>
+    <span class="pill">أزرار يمين</span>
+    <span class="pill">سحب يمين = كاميرا</span>
+    <span class="pill">لاعبان عبر نقطة الاتصال</span>
+    <span class="pill">بدون إنترنت</span>
+  </div>
+</header>
+
+<div class="note tip">
+  <b>الملف الجاهز:</b> <code>GameDemo-Mobile.apk</code> — 130 ميغابايت، موقّع بمفتاح إصدار، لحزمة <code>com.gamedemo.mobile</code>،
+  يعمل على أندرويد 7.0 وأحدث بمعمارية <code>arm64-v8a</code>.<br>
+  بصمة الملف: <code>MD5 59f9bdcd63a2e4a65e2f47e07f2441b0</code> ·
+  <code>SHA-256 897e8783dc0be8bb49ebe9702d3ae172d9d3323997f92ce35bf91c3ce409b324</code>
+</div>
+
+<h2>1) ما الذي صار بالضبط</h2>
+<p>اللعبة الأصلية (Chickensoft GameDemo) لعبة مغامرات ثلاثية الأبعاد مكتوبة بـ C# على Godot، تعمل بلوحة المفاتيح والفأرة على الحاسوب، ولا يوجد فيها أي كود شبكة.
+طلبت نسخة تعمل على الهاتف بواجهة لمس، وتُلعَب مع صديق عبر نقطة اتصال الهاتف. تم إنجاز ذلك بإضافة <b>طبقة جوال كاملة</b> بجانب كود اللعبة دون المساس بمنطق اللعبة نفسه:</p>
+<ul>
+  <li><b>لاتجاه والشاشة:</b> قفل الوضع الأفقي، وتمديد الصورة لملء الشاشة دون قص ولا أطراف سوداء (<code>stretch/aspect = expand</code>)، وشاشة كاملة غامرة (immersive) وإبقاء الشاشة مضاءة.</li>
+  <li><b>عصا تناظرية (يسار):</b> تتحكم بحركة الشخصية بالكامل (8 اتجاهات، شدة متغيّرة حسب بعد الإصبع، ومنطقة ميتة 16%).
+      العصا تكتب مباشرة في أفقيّة اللعبة (<code>move_left/right/up/down</code>) فلا يتغيّر أي سطر من كود اللعبة.</li>
+  <li><b>أزرار (يمين):</b> <code>JUMP</code> للقفز، <code>HIT</code> للهجوم، <code>SWAP</code> لتبديل السلاح، <code>II</code> للإيقاف المؤقت.</li>
+  <li><b>كاميرا بالسحب:</b> السحب على النصف الأيمن يولّد حركة فأرة حقيقية، فتدور الكاميرا عبر <b>نفس مسار الكود الأصلي</b>
+      (حساسية 0.2°/بكسل) — أي أنه لا توجد كاميرا مكتوبة من جديد قد تختلف في الإحساس عن الأصل.</li>
+  <li><b>القوائم تعمل باللمس:</b> أي نقرة قصيرة (بدون سحب) تُحوَّل إلى نقرة فأرة، فتعمل قوائم اللعبة الأصلية كما هي.</li>
+  <li><b>لمس متعدّد:</b> تحرّك وتضغط القفز في نفس اللحظة؛ وتُفرَّغ كل الأزرار تلقائيًا عند فقدان التركيز (مكالمة/إشعار) فلا تبقى أزرار «عالقة».</li>
+</ul>
+
+<h2>2) الشبكة المحلية (لاعبان عبر نقطة الاتصال)</h2>
+<div class="grid">
+  <div class="kpi"><b>HOST</b><small>الهاتف الأول يفتح اللعبة ويستمع على منفذ ثابت + بث إعلان كل ثانية</small></div>
+  <div class="kpi"><b>JOIN</b><small>الهاتف الثاني يجد اللعبة تلقائيًا في القائمة، أو يكتب <code>192.168.43.1</code></small></div>
+  <div class="kpi"><b>30/ثانية</b><small>معدّل إرسال حالة كل لاعب (حزم سريعة غير موثوقة مرتّبة)</small></div>
+  <div class="kpi"><b>صفر تأخير</b><small>كل لاعب يملك شخصيته بالكامل محليًا؛ لا ينتظر الشبكة إطلاقًا</small></div>
+</div>
+<h3>كيف تصير الحركة ناعمة بلا تعليق</h3>
+<ol>
+  <li><b>ملكية محلية كاملة:</b> الحركة والقفز والكاميرا تُحسب على الجهاز نفسه، والإرسال للشبكة لا يؤثر على استجابة الإصبع.</li>
+  <li><b>لقطات مرتّبة 30/ث:</b> الموقع والدوران والسرعة فقط — الحزم الصغيرة لا تتكدّس على شبكة الهاتف.</li>
+  <li><b>استيفاء بتأخير 90 مللي:</b> اللاعب البعيد يُرسم بين لقطتين معروفتين بدل القفز إلى آخر لقطة، فيختفي الاهتزاز عند وصول الحزم متقطّعة.</li>
+  <li><b>مصافحة قبل البدء:</b> لا تُرسَل حزم إلا بعد أن يكون الطرفان داخل الملعب، فلا تظهر أخطاء «العقدة غير موجودة» الشائعة.</li>
+  <li><b>نسخة اللاعب البعيد «دُمية»:</b> تُعطَّل محاكاتها الفيزيائية وطبقة تصادمها، فلا تسقط ولا تجمع العملات بالنيابة عنك ولا تتنازع مع شخصيتك.</li>
+</ol>
+
+<h2>3) خطوات التثبيت واللعب</h2>
+<h3>تثبيت</h3>
+<ol>
+  <li>انقل <code>GameDemo-Mobile.apk</code> إلى الهاتف (كلا الهاتفين يحتاجه).</li>
+  <li>افتح الملف واسمح بـ «تثبيت من مصادر غير معروفة» (وإن ظهر تحذير Play Protect اختر «تثبيت على أي حال»).</li>
+  <li>افتح التطبيق «GameDemo» — ستظهر شاشة البداية.</li>
+</ol>
+<h3>اللعب مع صديق عبر نقطة الاتصال</h3>
+<ol>
+  <li>الهاتف الأول: <b>الإعدادات ← نقطة اتصال الهاتف</b> وفعّلها (لا حاجة لأي بيانات إنترنت).</li>
+  <li>الهاتف الثاني: اتصل بشبكة الهاتف الأول.</li>
+  <li>الهاتف الأول: <b>HOST GAME</b> — الهاتف الثاني: سيظهر اسم اللعبة في قائمة «GAMES FOUND ON THIS NETWORK» فيضغط عليه (أو يكتب <code>192.168.43.1</code> ويضغط JOIN).</li>
+  <li>كلاهما يضغط <b>New Game</b> من قائمة اللعبة → تبدأ الشخصيتان بالظهور عند كل لاعب.</li>
+  <li>في أعلى اليسار تظهر حالة الشبكة: <code>LAN: connected</code> أو <code>LAN: waiting for the other phone...</code>.</li>
+</ol>
+
+<h2>4) نتائج التحقق (ما جُرِّب فعليًا)</h2>
+<table>
+<thead><tr><th>الفحص</th><th>الطريقة</th><th>النتيجة</th></tr></thead>
+<tbody>
+<tr><td>طبقة اللمس</td><td>25 فحصًا آليًا: العصا في 4 اتجاهات + المنطقة الميتة + كل زر + السحب + النقر + فقدان التركيز</td><td class="ok">25/25 ناجح</td></tr>
+<tr><td>كاميرا السحب</td><td>إرسال سحب 60 بكسل والتقاط حدث الفأرة الناتج عند مستقبل مستقل</td><td class="ok">مطابق تمامًا (60,0) بكسل</td></tr>
+<tr><td>عدّام النقر الخاطئ</td><td>سحب حقيقي يجب ألا يُنتج نقرة على القوائم</td><td class="ok">لا نقرة أثناء السحب</td></tr>
+<tr><td>الشبكة بين عمليتين فعليتين</td><td>عملية «مضيف» + عملية «ضيف» على نفس الجهاز، مع تحريك الشخصية في مسار دائري</td><td class="ok">211 حزمة في 7 ثوانٍ ≈ 30/ث</td></tr>
+<tr><td>نعومة النسخة البعيدة</td><td>قياس أكبر قفزة في موضع اللاعب البعيد بين إطارين</td><td class="ok">0.207 م (لا قفزات)</td></tr>
+<tr><td>تشغيل اللعبة الحقيقية</td><td>تحميل <code>App.tscn</code> ثم <code>Game.tscn</code> داخل شجرة اللعبة والتحقق من وجود الشخصية وكود الشبكة</td><td class="ok">بلا أخطاء C#</td></tr>
+<tr><td>الحزمة النهائية</td><td><code>apksigner verify</code> + قراءة بيان التطبيق + فحص المحتوى</td><td class="ok">موقّعة · أفقي مقفل · 68 نسيجًا مضغوطًا ETC2 · نموذج الشخصية داخل الحزمة</td></tr>
+</tbody>
+</table>
+
+<div class="note warn">
+  <b>ما لم يُجرَّب — بصراحة:</b>
+  <ul style="margin:6px 0 0">
+    <li><b>لا يوجد هاتف حقيقي في بيئة البناء</b>، لذلك لم أشغّل اللعبة على شاشة لمس فعلية. الفحوصات أعلاه تمّت على المحرك نفسه بمحاكاة شاشة وأحداث لمس حقيقية، وفحص الحزمة تمّ على الملف النهائي.</li>
+    <li><b>جودة الاتصال على راوتر الهاتف</b> (تأخير/فقدان حزم) لم تُقَس على جهازين؛ اختبار العمليتين يغطي النقل والاستيفاء لكنه على نفس الجهاز.</li>
+    <li><b>الشخصية البعيدة تتحرك بدون أنيميشن الجري</b> (تظهر واقفة وتنزلق) لأن أنيميشن اللعبة مرتبط بمنطقها الداخلي في C#؛ الحركة والموضع والدوران والكاميرا كلها صحيحة. هذا أول ما سأحسّنه إن أردت.</li>
+    <li><b>العملات والهدف مشتركان بصريًا:</b> كل جهاز يجمع العملات في نسخته؛ لا مزامنة كاملة لقواعد اللعبة (فوز/خسارة) في وضع الشبكة.</li>
+    <li><b>لا ضمان «صفر أخطاء»:</b> ما أقوله بدقة: كل ما سبق مُختبَر ونتائجه مذكورة أعلاه، وما لم يُختبر مذكور في هذه القائمة أيضًا.</li>
+  </ul>
+</div>
+
+<h2>5) كيف أُعيد البناء من المصدر</h2>
+<p>اللعبة .NET/C#، فبناؤها يحتاج أدوات إضافية عن مشاريع GDScript العادية. ما استُخدم هنا بالضبط:</p>
+<table>
+<thead><tr><th>الأداة</th><th>الإصدار/الملاحظة</th></tr></thead>
+<tbody>
+<tr><td>Godot</td><td>4.7.2 <b>.NET (mono)</b> + قوالب تصدير .NET</td></tr>
+<tr><td>.NET SDK</td><td>9.0.320 (قوالب Godot 4.7 لا تقبل <code>net8.0</code> — رُفع الهدف إلى <code>net9.0</code>)</td></tr>
+<tr><td>JDK / Android SDK</td><td>JDK 17 · build-tools 34 · platform 34 · minSdk 24 · targetSdk 36</td></tr>
+<tr><td>أصول المستودع</td><td>مستودع اللعبة يستخدم <b>Git LFS</b>؛ بدون <code>git lfs pull</code> تكون النماذج والصور ملفات نصية صغيرة (وهذا سبب فشل أول بناء)</td></tr>
+</tbody>
+</table>
+<pre># 1) الأصول
+git lfs install &amp;&amp; git lfs pull
+
+# 2) إعادة توليد الاستيراد (ضروري: ملفات .import القادمة من المستودع تحمل valid=false فلا يستوردها المحرك)
+find . -name "*.import" -not -path "./.godot/*" -delete
+godot --headless --path . --import
+
+# 3) بناء C# ثم التصدير
+dotnet build GameDemo.csproj -c ExportRelease
+godot --headless --path . --export-release "Android" build/gamedemo.apk</pre>
+
+<h2>6) الملفات في مساحة العمل</h2>
+<table>
+<thead><tr><th>الملف</th><th>الوصف</th></tr></thead>
+<tbody>
+<tr><td><code>GameDemo-Mobile.apk</code></td><td>الحزمة النهائية الموقّعة (نزّلها وثبّتها)</td></tr>
+<tr><td><code>mobile-src/</code></td><td>كل ملفات طبقة الجوال التي كتبتها (اللمس، الشبكة، اللوبي، الاختبارات) — جاهزة للنسخ فوق مستودع اللعبة</td></tr>
+<tr><td><code>gamedemo-mobile-lan.patch</code></td><td>فرق (diff) التعديلات على المشروع الأصلي: 30 ملفًا</td></tr>
+<tr><td><code>README-AR.md</code></td><td>دليل مختصر للتثبيت واللعب وإعادة البناء</td></tr>
+</tbody>
+</table>
+
+<footer>
+  بُني هذا العمل بتشغيل حقيقي للأدوات: تنزيل Godot .NET + .NET SDK + JDK + Android SDK، استيراد الأصول، بناء C#، تصدير وتوقيع الحزمة، ثم اختبارات آلية.
+  الأرقام المذكورة أعلاه مخرجات فعلية من سجلات التشغيل وليست تقديرات.
+</footer>
+
+</div>
+</body>
+</html>

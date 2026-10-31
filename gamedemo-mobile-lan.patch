@@ -1,0 +1,1535 @@
+diff --git a/GameDemo.csproj b/GameDemo.csproj
+index 7e37bda..9abeb53 100644
+--- a/GameDemo.csproj
++++ b/GameDemo.csproj
+@@ -1,6 +1,6 @@
+ <Project Sdk="Godot.NET.Sdk/4.7.2">
+   <PropertyGroup>
+-    <TargetFramework>net8.0</TargetFramework>
++    <TargetFramework>net9.0</TargetFramework>
+     <EnableDynamicLoading>true</EnableDynamicLoading>
+     <LangVersion>preview</LangVersion>
+     <Nullable>enable</Nullable>
+diff --git a/export_presets.cfg b/export_presets.cfg
+new file mode 100644
+index 0000000..5f838e1
+--- /dev/null
++++ b/export_presets.cfg
+@@ -0,0 +1,75 @@
++[preset.0]
++
++name="Android"
++platform="Android"
++runnable=true
++advanced_options=false
++dedicated_server=false
++custom_features=""
++export_filter="all_resources"
++include_filter=""
++exclude_filter="test/*,mobile/tests/*"
++exclude_filter=""
++export_path="build/gamedemo.apk"
++patches=PackedStringArray()
++encryption_include_filters=""
++encryption_exclude_filters=""
++seed=0
++encrypt_pck=false
++encrypt_directory=false
++script_export_mode=2
++
++[preset.0.options]
++
++custom_template/debug=""
++custom_template/release=""
++gradle_build/use_gradle_build=false
++gradle_build/gradle_build_directory=""
++gradle_build/android_source_template=""
++gradle_build/compress_native_libraries=false
++gradle_build/export_format=0
++gradle_build/min_sdk=""
++gradle_build/target_sdk=""
++architectures/armeabi-v7a=false
++architectures/arm64-v8a=true
++architectures/x86=false
++architectures/x86_64=false
++version/code=1
++version/name="1.0"
++package/unique_name="com.gamedemo.mobile"
++package/name="GameDemo"
++package/signed=true
++package/app_category=2
++package/retain_data_on_uninstall=false
++package/exclude_from_recents=false
++package/show_in_android_tv=false
++package/show_in_app_library=true
++package/show_as_launcher_app=false
++launcher_icons/main_192x192=""
++launcher_icons/adaptive_foreground_432x432=""
++launcher_icons/adaptive_background_432x432=""
++launcher_icons/adaptive_monochrome_432x432=""
++graphics/opengl_debug=false
++xr_features/xr_mode=0
++screen/immersive_mode=true
++screen/support_small=true
++screen/support_normal=true
++screen/support_large=true
++screen/support_xlarge=true
++user_data_backup/allow=false
++command_line/extra_args=""
++apk_expansion/enable=false
++apk_expansion/SALT=""
++apk_expansion/public_key=""
++permissions/custom_permissions=PackedStringArray()
++permissions/internet=true
++permissions/access_network_state=true
++permissions/change_wifi_state=true
++permissions/access_wifi_state=true
++permissions/change_network_state=true
++keystore/debug=""
++keystore/debug_user=""
++keystore/debug_password=""
++keystore/release="/home/user/.cache/keys/gamedemo-release.keystore"
++keystore/release_user="gamedemo"
++keystore/release_password="gamedemo2026"
+diff --git a/global.json b/global.json
+index 2809ae0..8dad719 100644
+--- a/global.json
++++ b/global.json
+@@ -4,6 +4,6 @@
+   },
+   "sdk": {
+     "rollForward": "major",
+-    "version": "8.0.427"
++    "version": "9.0.320"
+   }
+ }
+diff --git a/mobile/Lobby.tscn b/mobile/Lobby.tscn
+new file mode 100644
+index 0000000..f053bda
+--- /dev/null
++++ b/mobile/Lobby.tscn
+@@ -0,0 +1,12 @@
++[gd_scene load_steps=2 format=3]
++
++[ext_resource type="Script" path="res://mobile/lobby.gd" id="1_lobby"]
++
++[node name="Lobby" type="Control"]
++layout_mode = 3
++anchors_preset = 15
++anchor_right = 1.0
++anchor_bottom = 1.0
++grow_horizontal = 2
++grow_vertical = 2
++script = ExtResource("1_lobby")
+diff --git a/mobile/TouchUI.tscn b/mobile/TouchUI.tscn
+new file mode 100644
+index 0000000..3d9b92f
+--- /dev/null
++++ b/mobile/TouchUI.tscn
+@@ -0,0 +1,13 @@
++[gd_scene load_steps=2 format=3]
++
++[ext_resource type="Script" path="res://mobile/touch_ui.gd" id="1_touch"]
++
++[node name="TouchUI" type="Control"]
++layout_mode = 3
++anchors_preset = 15
++anchor_right = 1.0
++anchor_bottom = 1.0
++grow_horizontal = 2
++grow_vertical = 2
++mouse_filter = 2
++script = ExtResource("1_touch")
+diff --git a/mobile/lobby.gd b/mobile/lobby.gd
+new file mode 100644
+index 0000000..7f8b295
+--- /dev/null
++++ b/mobile/lobby.gd
+@@ -0,0 +1,180 @@
++extends Control
++## Start screen: play alone, host a LAN game, or join one found on the network.
++
++const GAME_SCENE := "res://src/app/App.tscn"
++
++var _status: Label
++var _hosts_box: VBoxContainer
++var _ip_edit: LineEdit
++var _buttons: Array[Button] = []
++
++func _ready() -> void:
++	set_anchors_preset(Control.PRESET_FULL_RECT)
++	_build()
++	Net.hosts_changed.connect(_refresh_hosts)
++	Net.connection_error.connect(func(msg: String) -> void: _set_status("Connection failed: " + msg))
++	Net.connected_ok.connect(func() -> void: _set_status("Connected! Starting game..."))
++	_refresh_hosts()
++	_handle_cmdline()
++
++func _handle_cmdline() -> void:
++	for arg in OS.get_cmdline_user_args():
++		if arg == "--solo":
++			_start_solo()
++			return
++		if arg == "--host":
++			_start_host()
++			return
++		if arg.begins_with("--join="):
++			_start_join(arg.substr(7))
++			return
++
++func _build() -> void:
++	var bg := ColorRect.new()
++	bg.color = Color(0.05, 0.07, 0.10)
++	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
++	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	add_child(bg)
++
++	var margin := MarginContainer.new()
++	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
++	margin.add_theme_constant_override("margin_left", 40)
++	margin.add_theme_constant_override("margin_right", 40)
++	margin.add_theme_constant_override("margin_top", 24)
++	margin.add_theme_constant_override("margin_bottom", 24)
++	add_child(margin)
++
++	var row := HBoxContainer.new()
++	row.add_theme_constant_override("separation", 48)
++	margin.add_child(row)
++
++	# --- left: actions
++	var left := VBoxContainer.new()
++	left.add_theme_constant_override("separation", 18)
++	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
++	row.add_child(left)
++
++	var title := Label.new()
++	title.text = "GAMEDEMO  ·  LAN"
++	title.add_theme_font_size_override("font_size", 46)
++	left.add_child(title)
++
++	var subtitle := Label.new()
++	subtitle.text = "Play alone, or play with a friend over a phone hotspot — no internet needed."
++	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
++	subtitle.add_theme_font_size_override("font_size", 22)
++	subtitle.add_theme_color_override("font_color", Color(0.75, 0.8, 0.9))
++	left.add_child(subtitle)
++
++	left.add_child(_make_button("PLAY ALONE", _start_solo, Color(0.2, 0.55, 0.35)))
++	left.add_child(_make_button("HOST GAME  (this phone opens the hotspot)", _start_host, Color(0.2, 0.45, 0.75)))
++
++	var join_row := HBoxContainer.new()
++	join_row.add_theme_constant_override("separation", 12)
++	left.add_child(join_row)
++	_ip_edit = LineEdit.new()
++	_ip_edit.placeholder_text = "192.168.43.1"
++	_ip_edit.text = "192.168.43.1"
++	_ip_edit.custom_minimum_size = Vector2(320, 84)
++	_ip_edit.add_theme_font_size_override("font_size", 26)
++	join_row.add_child(_ip_edit)
++	var join_btn := _make_button("JOIN", func() -> void: _start_join(_ip_edit.text.strip_edges()), Color(0.65, 0.45, 0.15))
++	join_btn.custom_minimum_size = Vector2(220, 84)
++	join_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
++	join_row.add_child(join_btn)
++
++	_status = Label.new()
++	_status.text = "Ready."
++	_status.add_theme_font_size_override("font_size", 20)
++	_status.add_theme_color_override("font_color", Color(0.6, 0.85, 0.75))
++	left.add_child(_status)
++
++	# --- right: discovered games
++	var right := VBoxContainer.new()
++	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
++	right.add_theme_constant_override("separation", 14)
++	row.add_child(right)
++
++	var found := Label.new()
++	found.text = "GAMES FOUND ON THIS NETWORK"
++	found.add_theme_font_size_override("font_size", 24)
++	found.add_theme_color_override("font_color", Color(0.7, 0.75, 0.9))
++	right.add_child(found)
++
++	_hosts_box = VBoxContainer.new()
++	_hosts_box.add_theme_constant_override("separation", 12)
++	right.add_child(_hosts_box)
++
++	var help := Label.new()
++	help.text = "How to play with a friend:\n1. Phone A: Settings > Hotspot > turn it on.\n2. Phone B: connect to phone A's hotspot.\n3. Phone A: HOST GAME.  Phone B: JOIN (its name appears here automatically)."
++	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
++	help.add_theme_font_size_override("font_size", 18)
++	help.add_theme_color_override("font_color", Color(0.6, 0.65, 0.75))
++	right.add_child(help)
++
++func _make_button(text: String, cb: Callable, tint: Color) -> Button:
++	var button := Button.new()
++	button.text = text
++	button.custom_minimum_size = Vector2(0, 96)
++	button.add_theme_font_size_override("font_size", 28)
++	var normal := StyleBoxFlat.new()
++	normal.bg_color = tint
++	normal.set_corner_radius_all(14)
++	var hover := normal.duplicate() as StyleBoxFlat
++	hover.bg_color = tint.lightened(0.15)
++	var pressed := normal.duplicate() as StyleBoxFlat
++	pressed.bg_color = tint.darkened(0.2)
++	button.add_theme_stylebox_override("normal", normal)
++	button.add_theme_stylebox_override("hover", hover)
++	button.add_theme_stylebox_override("pressed", pressed)
++	button.pressed.connect(cb)
++	_buttons.append(button)
++	return button
++
++func _refresh_hosts() -> void:
++	if _hosts_box == null:
++		return
++	for child in _hosts_box.get_children():
++		child.queue_free()
++	if Net.hosts.is_empty():
++		var empty := Label.new()
++		empty.text = "Searching..." if Net.mode != Net.Mode.HOST else "You are hosting."
++		empty.add_theme_font_size_override("font_size", 20)
++		empty.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
++		_hosts_box.add_child(empty)
++		return
++	for ip in Net.hosts.keys():
++		var info: Dictionary = Net.hosts[ip]
++		var button := _make_button("%s   (%s)" % [info.name, ip], _on_host_pressed.bind(ip), Color(0.25, 0.35, 0.6))
++		button.custom_minimum_size = Vector2(0, 76)
++		_hosts_box.add_child(button)
++
++func _on_host_pressed(ip: String) -> void:
++	_start_join(ip)
++
++func _set_status(text: String) -> void:
++	if _status != null:
++		_status.text = text
++
++func _start_solo() -> void:
++	Net.close()
++	get_tree().change_scene_to_file(GAME_SCENE)
++
++func _start_host() -> void:
++	var err := Net.host_game()
++	if err != "":
++		_set_status("Could not host: " + err)
++		return
++	_set_status("Hosting on port %d — your friend joins the same hotspot." % Net.PORT)
++	get_tree().change_scene_to_file(GAME_SCENE)
++
++func _start_join(ip: String) -> void:
++	if ip == "":
++		_set_status("Type the host's IP first (usually 192.168.43.1).")
++		return
++	var err := Net.join_game(ip)
++	if err != "":
++		_set_status("Could not join: " + err)
++		return
++	_set_status("Connecting to %s ..." % ip)
++	get_tree().change_scene_to_file(GAME_SCENE)
+diff --git a/mobile/lobby.gd.uid b/mobile/lobby.gd.uid
+new file mode 100644
+index 0000000..ba33490
+--- /dev/null
++++ b/mobile/lobby.gd.uid
+@@ -0,0 +1 @@
++uid://3f0avt0qyu5p
+diff --git a/mobile/net.gd b/mobile/net.gd
+new file mode 100644
+index 0000000..ae32199
+--- /dev/null
++++ b/mobile/net.gd
+@@ -0,0 +1,159 @@
++extends Node
++## LAN transport for GameDemo (offline, phone hotspot friendly).
++##
++## * Host: ENet server on PORT + UDP broadcast advertisement every second.
++## * Join: listens for advertisements (auto discovery) or takes a manual IP.
++## * No internet, no relay, no accounts: everything is on the local network.
++
++const PORT := 45871
++const DISCOVERY_PORT := 45872
++const MAGIC := "GDM1"
++const MAX_CLIENTS := 1  # 2 players total (host + 1)
++
++enum Mode { SOLO, HOST, CLIENT }
++
++var mode: int = Mode.SOLO
++var hosts: Dictionary = {}        # ip -> {name, time}
++var last_error: String = ""
++var peer_connected_flag := false
++
++signal hosts_changed
++signal connected_ok
++signal connection_error(message: String)
++signal host_left
++
++var _udp_send: PacketPeerUDP
++var _udp_recv: PacketPeerUDP
++var _advertise_accum := 0.0
++var _local_name := ""
++
++func _ready() -> void:
++	set_process(true)
++	multiplayer.peer_connected.connect(_on_peer_connected)
++	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
++	multiplayer.connected_to_server.connect(_on_connected_to_server)
++	multiplayer.connection_failed.connect(_on_connection_failed)
++	multiplayer.server_disconnected.connect(_on_server_disconnected)
++	_local_name = "GameDemo-" + str(randi() % 900 + 100)
++	_handle_cmdline()
++
++func _handle_cmdline() -> void:
++	# The autoload is created before the first scene, so hosting / joining from
++	# the command line is ready before any game node is loaded. This is what the
++	# automated LAN test uses (and it also allows `--host` shortcuts).
++	for arg in OS.get_cmdline_user_args():
++		if arg == "--host":
++			host_game()
++			return
++		if arg.begins_with("--join="):
++			join_game(arg.substr(7))
++			return
++
++func is_multiplayer() -> bool:
++	return mode != Mode.SOLO
++
++# ------------------------------------------------------------------ host ----
++
++func host_game() -> String:
++	close()
++	mode = Mode.HOST
++	var enet := ENetMultiplayerPeer.new()
++	var err := enet.create_server(PORT, MAX_CLIENTS)
++	if err != OK:
++		last_error = "could not open port %d (error %d)" % [PORT, err]
++		mode = Mode.SOLO
++		return last_error
++	multiplayer.multiplayer_peer = enet
++	_start_advertising()
++	return ""
++
++func _start_advertising() -> void:
++	_udp_send = PacketPeerUDP.new()
++	_udp_send.set_broadcast_enabled(true)
++	var payload := "%s|%s|%d" % [MAGIC, _local_name, PORT]
++	_udp_send.set_dest_address("255.255.255.255", DISCOVERY_PORT)
++	_udp_send.put_packet(payload.to_utf8_buffer())
++	_advertise_accum = 0.0
++
++func _start_listening() -> void:
++	if _udp_recv != null:
++		return
++	_udp_recv = PacketPeerUDP.new()
++	var err := _udp_recv.bind(DISCOVERY_PORT, "0.0.0.0")
++	if err != OK:
++		# Port busy (e.g. we are the host) - not fatal, manual IP still works.
++		_udp_recv = null
++		return
++
++# ------------------------------------------------------------------ join ----
++
++func join_game(ip: String) -> String:
++	close()
++	mode = Mode.CLIENT
++	var enet := ENetMultiplayerPeer.new()
++	var err := enet.create_client(ip, PORT)
++	if err != OK:
++		last_error = "could not reach %s (error %d)" % [ip, err]
++		mode = Mode.SOLO
++		return last_error
++	multiplayer.multiplayer_peer = enet
++	_start_listening()
++	return ""
++
++func close() -> void:
++	if multiplayer.multiplayer_peer != null:
++		multiplayer.multiplayer_peer.close()
++		multiplayer.multiplayer_peer = null
++	_udp_send = null
++	peer_connected_flag = false
++	mode = Mode.SOLO
++
++func _process(delta: float) -> void:
++	if mode == Mode.HOST and _udp_send != null:
++		_advertise_accum += delta
++		if _advertise_accum >= 1.0:
++			_advertise_accum = 0.0
++			var payload := "%s|%s|%d" % [MAGIC, _local_name, PORT]
++			_udp_send.set_dest_address("255.255.255.255", DISCOVERY_PORT)
++			_udp_send.put_packet(payload.to_utf8_buffer())
++	if _udp_recv != null:
++		var now := Time.get_ticks_msec() / 1000.0
++		var changed := false
++		while _udp_recv.get_available_packet_count() > 0:
++			var text := _udp_recv.get_packet().get_string_from_utf8()
++			var ip := _udp_recv.get_packet_ip()
++			var parts := text.split("|")
++			if parts.size() >= 3 and parts[0] == MAGIC:
++				hosts[ip] = {"name": parts[1], "time": now}
++				changed = true
++		for ip in hosts.keys():
++			if now - hosts[ip].time > 3.5:
++				hosts.erase(ip)
++				changed = true
++		if changed:
++			hosts_changed.emit()
++
++# --------------------------------------------------------------- signals ----
++
++func _on_peer_connected(_id: int) -> void:
++	peer_connected_flag = true
++
++func _on_peer_disconnected(_id: int) -> void:
++	peer_connected_flag = false
++	host_left.emit()
++
++func _on_connected_to_server() -> void:
++	peer_connected_flag = true
++	connected_ok.emit()
++
++func _on_connection_failed() -> void:
++	last_error = "connection failed"
++	peer_connected_flag = false
++	connection_error.emit(last_error)
++
++func _on_server_disconnected() -> void:
++	peer_connected_flag = false
++	host_left.emit()
++
++func my_ip_hint() -> String:
++	return "192.168.43.1"
+diff --git a/mobile/net.gd.uid b/mobile/net.gd.uid
+new file mode 100644
+index 0000000..3708b5b
+--- /dev/null
++++ b/mobile/net.gd.uid
+@@ -0,0 +1 @@
++uid://cjqu48vjw0fct
+diff --git a/mobile/net_sync.gd b/mobile/net_sync.gd
+new file mode 100644
+index 0000000..cb84809
+--- /dev/null
++++ b/mobile/net_sync.gd
+@@ -0,0 +1,183 @@
++extends Node
++## Replicates the two players between the two phones.
++##
++## Each phone fully owns its own character (input -> physics -> camera), so the
++## local player never waits for the network: zero input lag. The other player is
++## a "puppet" whose transform is streamed 30 times per second and rendered
++## ~90 ms in the past, interpolated between the two surrounding snapshots. That
++## is what makes it look smooth instead of stuttering, even on a phone hotspot
++## where packets arrive in bursts.
++
++const SEND_RATE := 30.0
++const RENDER_DELAY := 0.09
++const MAX_BUFFER := 32
++const HELLO_INTERVAL := 0.5
++
++var local_player: Node3D
++var puppet: Node3D
++var remote_in_game := false
++
++var _buffer: Array = []
++var packets_received := 0
++var _accum := 0.0
++var _hello_accum := 0.0
++var _spawned := false
++var _time := 0.0
++
++# ------------------------------------------------------------ pure logic ----
++
++## Interpolates the remote player between the two snapshots that surround
++## `render_time`. Exposed as a static helper so it can be unit tested.
++static func sample(buffer: Array, render_time: float) -> Variant:
++	if buffer.is_empty():
++		return null
++	if buffer.size() == 1:
++		return buffer[0]
++	if render_time <= buffer[0].t:
++		return buffer[0]
++	var last: Dictionary = buffer[buffer.size() - 1]
++	if render_time >= last.t:
++		return last
++	for i in range(1, buffer.size()):
++		var b: Dictionary = buffer[i]
++		if b.t >= render_time:
++			var a: Dictionary = buffer[i - 1]
++			var span: float = maxf(0.0001, b.t - a.t)
++			var f: float = (render_time - a.t) / span
++			return {
++				"t": render_time,
++				"pos": (a.pos as Vector3).lerp(b.pos, f),
++				"yaw": lerp_angle(a.yaw, b.yaw, f),
++			}
++	return last
++
++# ---------------------------------------------------------------- setup ----
++
++var _ready_done := false
++
++func _ready() -> void:
++	set_process(true)
++	set_physics_process(true)
++
++## NetSync may be created before the LAN mode is chosen (the lobby runs first),
++## so we simply wait until there is a peer and a local player to replicate.
++func _try_init() -> bool:
++	if _ready_done:
++		return true
++	if not Net.is_multiplayer():
++		return false
++	var scene := get_tree().current_scene
++	if scene == null:
++		scene = get_tree().get_first_node_in_group("game_scene")
++	local_player = scene.get_node_or_null("PauseContainer/Player") if scene else null
++	if local_player == null:
++		return false
++	Net.host_left.connect(_on_host_left)
++	_ready_done = true
++	_time = Time.get_ticks_msec() / 1000.0
++	return true
++
++## The peer we replicate with. The server is always peer 1; on the host side we
++## ask the multiplayer API instead of assuming an id, so we never send to a peer
++## that is not connected yet.
++func _other_peer() -> int:
++	if Net.mode == Net.Mode.CLIENT:
++		return 1
++	var peers := multiplayer.get_peers()
++	return peers[0] if peers.size() > 0 else 0
++
++# --------------------------------------------------------- handshake ----
++
++@rpc("any_peer", "call_remote", "reliable")
++func _hello() -> void:
++	remote_in_game = true
++	var sender := multiplayer.get_remote_sender_id()
++	if sender != 0:
++		rpc_id(sender, "_hello_ack")
++	_ensure_puppet()
++
++@rpc("any_peer", "call_remote", "reliable")
++func _hello_ack() -> void:
++	remote_in_game = true
++	_ensure_puppet()
++
++func _ensure_puppet() -> void:
++	if _spawned or local_player == null:
++		return
++	var scene_file := load("res://src/player/Player.tscn")
++	if scene_file == null:
++		return
++	var container := local_player.get_parent()
++	puppet = scene_file.instantiate()
++	puppet.name = "RemotePlayer"
++	container.add_child(puppet)
++	# The puppet must never simulate itself: no physics, no coin pickups.
++	puppet.set_physics_process(false)
++	puppet.set_process(false)
++	puppet.collision_layer = 0
++	puppet.collision_mask = 1
++	puppet.global_transform = local_player.global_transform
++	_spawned = true
++
++# ------------------------------------------------------------ transport ----
++
++func _physics_process(delta: float) -> void:
++	if not _try_init():
++		return
++	_time = Time.get_ticks_msec() / 1000.0
++	if not remote_in_game:
++		_hello_accum += delta
++		if _hello_accum >= HELLO_INTERVAL:
++			_hello_accum = 0.0
++			var target := _other_peer()
++			if target != 0:
++				rpc_id(target, "_hello")
++		return
++	_accum += delta
++	var step := 1.0 / SEND_RATE
++	while _accum >= step:
++		_accum -= step
++		_send_state()
++
++func _send_state() -> void:
++	if local_player == null:
++		return
++	var target := _other_peer()
++	if target == 0:
++		return
++	var t := local_player.global_transform
++	var velocity: Variant = local_player.get("velocity")
++	rpc_id(
++		target, "_receive_state", t.origin, t.basis.get_euler().y,
++		velocity if velocity is Vector3 else Vector3.ZERO
++	)
++
++@rpc("any_peer", "unreliable_ordered", "call_remote")
++func _receive_state(pos: Vector3, yaw: float, velocity: Vector3) -> void:
++	var now := Time.get_ticks_msec() / 1000.0
++	packets_received += 1
++	_buffer.append({"t": now, "pos": pos, "yaw": yaw, "vel": velocity})
++	while _buffer.size() > MAX_BUFFER:
++		_buffer.pop_front()
++	remote_in_game = true
++	_ensure_puppet()
++
++func _process(_delta: float) -> void:
++	if not _ready_done or puppet == null or _buffer.is_empty():
++		return
++	var now := Time.get_ticks_msec() / 1000.0
++	var state: Variant = sample(_buffer, now - RENDER_DELAY)
++	if state == null:
++		return
++	var origin: Vector3 = (state.pos as Vector3)
++	var basis := Basis(Vector3.UP, state.yaw)
++	puppet.global_transform = Transform3D(basis, origin)
++	if state.has("vel"):
++		puppet.set("velocity", state.vel)
++
++func _on_host_left() -> void:
++	remote_in_game = false
++	_buffer.clear()
++	if is_instance_valid(puppet):
++		puppet.queue_free()
++	_spawned = false
+diff --git a/mobile/net_sync.gd.uid b/mobile/net_sync.gd.uid
+new file mode 100644
+index 0000000..27380f1
+--- /dev/null
++++ b/mobile/net_sync.gd.uid
+@@ -0,0 +1 @@
++uid://c4vek7dby21oa
+diff --git a/mobile/tests/Dbg.tscn b/mobile/tests/Dbg.tscn
+new file mode 100644
+index 0000000..9b214b4
+--- /dev/null
++++ b/mobile/tests/Dbg.tscn
+@@ -0,0 +1,6 @@
++[gd_scene load_steps=2 format=3]
++
++[ext_resource type="Script" path="res://mobile/tests/dbg.gd" id="1"]
++
++[node name="Dbg" type="Node"]
++script = ExtResource("1")
+diff --git a/mobile/tests/LoadTest.tscn b/mobile/tests/LoadTest.tscn
+new file mode 100644
+index 0000000..0d61450
+--- /dev/null
++++ b/mobile/tests/LoadTest.tscn
+@@ -0,0 +1,6 @@
++[gd_scene load_steps=2 format=3]
++
++[ext_resource type="Script" path="res://mobile/tests/loadtest.gd" id="1"]
++
++[node name="LoadTest" type="Node"]
++script = ExtResource("1")
+diff --git a/mobile/tests/NetProbe.tscn b/mobile/tests/NetProbe.tscn
+new file mode 100644
+index 0000000..c90af03
+--- /dev/null
++++ b/mobile/tests/NetProbe.tscn
+@@ -0,0 +1,14 @@
++[gd_scene load_steps=3 format=3]
++
++[ext_resource type="Script" path="res://mobile/tests/net_probe.gd" id="1_probe"]
++[ext_resource type="Script" path="res://mobile/net_sync.gd" id="2_sync"]
++
++[node name="Game" type="Node3D" groups=["game_scene"]]
++script = ExtResource("1_probe")
++
++[node name="PauseContainer" type="Node3D" parent="."]
++
++[node name="Player" type="Node3D" parent="PauseContainer"]
++
++[node name="NetSync" type="Node" parent="."]
++script = ExtResource("2_sync")
+diff --git a/mobile/tests/Smoke.tscn b/mobile/tests/Smoke.tscn
+new file mode 100644
+index 0000000..d667e67
+--- /dev/null
++++ b/mobile/tests/Smoke.tscn
+@@ -0,0 +1,6 @@
++[gd_scene load_steps=2 format=3]
++
++[ext_resource type="Script" path="res://mobile/tests/smoke.gd" id="1"]
++
++[node name="Smoke" type="Node"]
++script = ExtResource("1")
+diff --git a/mobile/tests/TouchTest.tscn b/mobile/tests/TouchTest.tscn
+new file mode 100644
+index 0000000..a4a950c
+--- /dev/null
++++ b/mobile/tests/TouchTest.tscn
+@@ -0,0 +1,6 @@
++[gd_scene load_steps=2 format=3]
++
++[ext_resource type="Script" path="res://mobile/tests/touch_test.gd" id="1_test"]
++
++[node name="TouchTest" type="Node"]
++script = ExtResource("1_test")
+diff --git a/mobile/tests/dbg.gd b/mobile/tests/dbg.gd
+new file mode 100644
+index 0000000..8c5a11a
+--- /dev/null
++++ b/mobile/tests/dbg.gd
+@@ -0,0 +1,12 @@
++extends Node
++func _ready():
++	var game := Node.new(); game.name = "Game"
++	get_tree().root.add_child(game)
++	get_tree().current_scene = game
++	await get_tree().process_frame
++	print("current_scene=", get_tree().current_scene, " name=", get_tree().current_scene.name)
++	print("TouchUI joy_center=", TouchUI._joy_center, " r=", TouchUI._joy_radius)
++	print("TouchUI viewport rect=", TouchUI.get_viewport_rect().size)
++	print("root rect=", get_tree().root.get_visible_rect().size, " win=", DisplayServer.window_get_size())
++	print("buttons=", TouchUI._buttons.map(func(b): return [b.name, b.center, b.radius]))
++	get_tree().quit()
+diff --git a/mobile/tests/dbg.gd.uid b/mobile/tests/dbg.gd.uid
+new file mode 100644
+index 0000000..b0af1f6
+--- /dev/null
++++ b/mobile/tests/dbg.gd.uid
+@@ -0,0 +1 @@
++uid://b8phpfbr2xjn1
+diff --git a/mobile/tests/loadtest.gd b/mobile/tests/loadtest.gd
+new file mode 100644
+index 0000000..b78ecd0
+--- /dev/null
++++ b/mobile/tests/loadtest.gd
+@@ -0,0 +1,6 @@
++extends Node
++func _ready():
++	for path in ["res://icon.png", "res://src/player/visuals/chicken/chicken.tscn", "res://src/map/terrain.glb", "res://src/map/Map.tscn", "res://src/game/Game.tscn", "res://src/app/App.tscn"]:
++		var r = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
++		print(path, " -> ", r)
++	get_tree().quit()
+diff --git a/mobile/tests/loadtest.gd.uid b/mobile/tests/loadtest.gd.uid
+new file mode 100644
+index 0000000..26bcd12
+--- /dev/null
++++ b/mobile/tests/loadtest.gd.uid
+@@ -0,0 +1 @@
++uid://bumkh0bajcgmb
+diff --git a/mobile/tests/net_probe.gd b/mobile/tests/net_probe.gd
+new file mode 100644
+index 0000000..7bbf22d
+--- /dev/null
++++ b/mobile/tests/net_probe.gd
+@@ -0,0 +1,92 @@
++extends Node
++## Two-process LAN probe used to verify the real net_sync.gd replication code.
++##
++##   godot --headless --path . res://mobile/tests/NetProbe.tscn -- --host
++##   godot --headless --path . res://mobile/tests/NetProbe.tscn -- --join=127.0.0.1
++
++const HOST_DURATION := 16.0
++const CLIENT_DURATION := 8.0
++
++var role := ""
++var sync: Node
++var player: Node3D
++var elapsed := 0.0
++var samples := 0
++var worst := 0.0
++var total_err := 0.0
++var _last_count := 0
++var _last_pos := Vector3.ZERO
++var _have_last := false
++var max_jump := 0.0
++var _start := 0.0
++
++func _ready() -> void:
++	for arg in OS.get_cmdline_user_args():
++		if arg == "--host":
++			role = "host"
++		elif arg.begins_with("--join="):
++			role = "client"
++			_target_ip = arg.substr(7)
++	_setup.call_deferred()
++
++var _target_ip := "127.0.0.1"
++
++func _setup() -> void:
++	await get_tree().process_frame
++	player = get_node("PauseContainer/Player") as Node3D
++	sync = get_node("NetSync")
++	# Net (the autoload) already hosted / joined from the `--host` / `--join=`
++	# command line arguments, before this scene was created.
++	if role == "host":
++		print("PROBE_HOST_LISTENING")
++	else:
++		print("PROBE_CLIENT_CONNECTING")
++	_start = Time.get_ticks_msec() / 1000.0
++
++func _physics_process(delta: float) -> void:
++	if role == "" or player == null or sync == null:
++		return
++	elapsed += delta
++	var duration := HOST_DURATION if role == "host" else CLIENT_DURATION
++	if role == "host":
++		# Drive the local player along a known path so the client can measure
++		# how far the replicated puppet is from the truth.
++		player.global_position = Vector3(sin(elapsed * 1.2) * 6.0, 2.0, cos(elapsed * 1.2) * 6.0)
++		player.rotation.y = elapsed * 0.9
++	if elapsed > duration:
++		_finish()
++		return
++	if role == "client":
++		var buffer: Array = sync._buffer
++		if buffer.size() != _last_count and buffer.size() > 0:
++			_last_count = buffer.size()
++			samples += 1
++		var puppet := sync.puppet as Node3D
++		if puppet != null and is_instance_valid(puppet) and elapsed > 1.5:
++			if _have_last:
++				max_jump = maxf(max_jump, (puppet.global_position - _last_pos).length())
++			_last_pos = puppet.global_position
++			_have_last = true
++		if puppet != null and is_instance_valid(puppet) and buffer.size() > 2:
++			var now := Time.get_ticks_msec() / 1000.0
++			var state: Variant = sync.sample(buffer, now - sync.RENDER_DELAY)
++			if state != null:
++				var err: float = (puppet.global_position - (state.pos as Vector3)).length()
++				total_err += err
++				worst = maxf(worst, err)
++
++func _finish() -> void:
++	if role == "host":
++		print("PROBE_HOST_OK connected=%s" % str(Net.peer_connected_flag))
++		get_tree().quit(0 if Net.peer_connected_flag else 1)
++		return
++	var avg := total_err / maxf(1.0, float(samples))
++	var puppet_ok := sync.puppet != null and is_instance_valid(sync.puppet)
++	print("PROBE_CLIENT connected=%s puppet=%s packets=%d max_frame_jump=%.3f" % [
++		str(Net.peer_connected_flag), str(puppet_ok), sync.packets_received, max_jump
++	])
++	# 30 packets/s for 8 s ~= 240; a hotspot may lose a few, so require 60%.
++	var ok: bool = Net.peer_connected_flag and puppet_ok and sync.packets_received >= 130 and max_jump < 1.0
++	if ok:
++		print("NET_TEST_OK")
++	get_tree().quit(0 if ok else 1)
+diff --git a/mobile/tests/net_probe.gd.uid b/mobile/tests/net_probe.gd.uid
+new file mode 100644
+index 0000000..a5e42b8
+--- /dev/null
++++ b/mobile/tests/net_probe.gd.uid
+@@ -0,0 +1 @@
++uid://danvkdtcmr6j8
+diff --git a/mobile/tests/smoke.gd b/mobile/tests/smoke.gd
+new file mode 100644
+index 0000000..e8d3218
+--- /dev/null
++++ b/mobile/tests/smoke.gd
+@@ -0,0 +1,31 @@
++extends Node
++## Boots the real game (App -> splash -> menu) and the real Game scene and
++## reports any script/runtime error that happens along the way.
++func _ready() -> void:
++	_run.call_deferred()
++
++func _run() -> void:
++	var app := load("res://src/app/App.tscn")
++	if app == null:
++		print("SMOKE_FAIL app scene missing")
++		get_tree().quit(1)
++		return
++	var node: Node = app.instantiate()
++	add_child(node)
++	await get_tree().create_timer(3.0).timeout
++	print("SMOKE_APP_OK children=", node.get_child_count(), " touch_ui=", TouchUI != null, " net=", Net != null)
++	for p in node.find_children("*", "Control", true, false):
++		var b := p as Button
++		if b != null and b.visible:
++			print("  button: ", b.name, " text=", b.text)
++	var game_scene: PackedScene = load("res://src/game/Game.tscn")
++	var game: Node = game_scene.instantiate()
++	var preview: Node = node.find_child("GamePreview", true, false)
++	if preview == null:
++		print("SMOKE_FAIL no GamePreview node")
++		get_tree().quit(1)
++		return
++	preview.add_child(game)
++	await get_tree().create_timer(2.5).timeout
++	print("SMOKE_GAME_OK netsync=", game.get_node_or_null("NetSync") != null, " player=", game.get_node_or_null("PauseContainer/Player") != null)
++	get_tree().quit(0)
+diff --git a/mobile/tests/smoke.gd.uid b/mobile/tests/smoke.gd.uid
+new file mode 100644
+index 0000000..22be18e
+--- /dev/null
++++ b/mobile/tests/smoke.gd.uid
+@@ -0,0 +1 @@
++uid://c4n6el81cyhw7
+diff --git a/mobile/tests/touch_test.gd b/mobile/tests/touch_test.gd
+new file mode 100644
+index 0000000..cb58a9b
+--- /dev/null
++++ b/mobile/tests/touch_test.gd
+@@ -0,0 +1,174 @@
++extends Node
++## Headless verification of the mobile touch layer.
++##
++## Run:  godot --headless --path . res://mobile/tests/TouchTest.tscn
++## Exit code 0 = every check passed.
++
++var checks := 0
++var failures: Array[String] = []
++
++var _probe_motion: Array = []
++var _probe_clicks: Array = []
++
++class Probe extends Node:
++	var motions: Array = []
++	var clicks: Array = []
++	func _input(event: InputEvent) -> void:
++		if event is InputEventMouseMotion:
++			motions.append(event.relative)
++		elif event is InputEventMouseButton:
++			clicks.append([event.pressed, event.position])
++
++var probe: Probe
++
++func _ready() -> void:
++	_run.call_deferred()
++
++func check(condition: bool, what: String) -> void:
++	checks += 1
++	if not condition:
++		failures.append(what)
++		print("  FAIL  ", what)
++
++func approx(a: float, b: float, eps := 0.02) -> bool:
++	return absf(a - b) <= eps
++
++func _touch(index: int, pos: Vector2, pressed: bool) -> void:
++	var ev := InputEventScreenTouch.new()
++	ev.index = index
++	ev.position = pos
++	ev.pressed = pressed
++	Input.parse_input_event(ev)
++
++func _drag(index: int, pos: Vector2, relative: Vector2) -> void:
++	var ev := InputEventScreenDrag.new()
++	ev.index = index
++	ev.position = pos
++	ev.relative = relative
++	Input.parse_input_event(ev)
++
++func _run() -> void:
++	# A stand-in for the real game scene: the touch layer only activates its
++	# gameplay controls while a scene called "Game" is the current scene.
++	var game := Node.new()
++	game.name = "Game"
++	game.add_to_group("game_scene")
++	get_tree().root.add_child(game)
++
++	probe = Probe.new()
++	get_tree().root.add_child(probe)
++
++	# The headless display server reports a tiny window, which makes the engine
++	# stretch every parsed input event by a large factor. Turn the stretch off
++	# so that the coordinates we inject are the coordinates the layer sees
++	# (this mirrors a device with stretch/aspect = expand, where the factor is 1).
++	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
++	get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_IGNORE
++	await get_tree().process_frame
++	TouchUI._layout()
++
++	await get_tree().process_frame
++	await get_tree().process_frame
++
++	var size: Vector2 = TouchUI.get_viewport_rect().size
++	var joy_center: Vector2 = TouchUI._joy_center
++	var joy_radius: float = TouchUI._joy_radius
++	print("viewport ", size, " joystick ", joy_center, " r=", joy_radius)
++
++	# ---------------------------------------------------------- analog stick
++	_touch(0, joy_center + Vector2(joy_radius * 0.9, 0), true)
++	await get_tree().process_frame
++	check(Input.is_action_pressed("move_right"), "stick right -> move_right")
++	check(not Input.is_action_pressed("move_left"), "stick right -> move_left released")
++	check(Input.get_action_strength("move_right") > 0.6, "stick right -> analog strength")
++	check(not Input.is_action_pressed("move_up"), "stick right -> move_up released")
++
++	_drag(0, joy_center + Vector2(joy_radius * 0.9, -joy_radius * 0.9), Vector2(0, -joy_radius * 0.9))
++	await get_tree().process_frame
++	check(Input.is_action_pressed("move_up"), "stick up-right -> move_up")
++	check(Input.is_action_pressed("move_right"), "stick up-right -> move_right")
++
++	_drag(0, joy_center + Vector2(-joy_radius * 0.9, joy_radius * 0.9), Vector2(-joy_radius * 1.8, joy_radius * 1.8))
++	await get_tree().process_frame
++	check(Input.is_action_pressed("move_left"), "stick down-left -> move_left")
++	check(Input.is_action_pressed("move_down"), "stick down-left -> move_down")
++	check(not Input.is_action_pressed("move_right"), "stick down-left -> move_right released")
++	check(not Input.is_action_pressed("move_up"), "stick down-left -> move_up released")
++
++	_drag(0, joy_center + Vector2(joy_radius * 0.05, 0), Vector2(joy_radius * 0.95, 0))
++	await get_tree().process_frame
++	check(not Input.is_action_pressed("move_right"), "stick inside dead zone -> released")
++
++	_touch(0, joy_center, false)
++	await get_tree().process_frame
++	check(not Input.is_action_pressed("move_left"), "stick released -> all move actions off")
++
++	# -------------------------------------------------------- action buttons
++	var jump_center: Vector2 = TouchUI._buttons[0].center
++	_touch(1, jump_center, true)
++	await get_tree().process_frame
++	check(Input.is_action_pressed("jump"), "JUMP button -> jump action")
++	_touch(1, jump_center, false)
++	await get_tree().process_frame
++	check(not Input.is_action_pressed("jump"), "JUMP released -> jump action off")
++
++	var attack_center: Vector2 = TouchUI._buttons[1].center
++	_touch(2, attack_center, true)
++	await get_tree().process_frame
++	check(Input.is_action_pressed("attack"), "HIT button -> attack action")
++	_touch(2, attack_center, false)
++
++	var swap_center: Vector2 = TouchUI._buttons[2].center
++	_touch(3, swap_center, true)
++	await get_tree().process_frame
++	check(Input.is_action_pressed("swap_weapons"), "SWAP button -> swap_weapons action")
++	_touch(3, swap_center, false)
++
++	# --------------------------------------------------------- camera drag
++	probe.motions.clear()
++	probe.clicks.clear()
++	var cam_start := Vector2(size.x * 0.80, size.y * 0.30)
++	_touch(4, cam_start, true)
++	await get_tree().process_frame
++	_drag(4, cam_start + Vector2(60, 0), Vector2(60, 0))
++	await get_tree().process_frame
++	check(probe.motions.size() >= 1, "camera drag emits mouse motion")
++	var total := Vector2.ZERO
++	for m in probe.motions:
++		total += m
++	check(approx(total.x, 60, 1.0) and approx(total.y, 0, 1.0), "camera drag delta matches finger delta (%s)" % total)
++	check(not Input.is_action_pressed("move_right"), "camera drag does not move the character")
++	_drag(4, cam_start + Vector2(60, -40), Vector2(0, -40))
++	await get_tree().process_frame
++	_touch(4, cam_start + Vector2(60, -40), false)
++	await get_tree().process_frame
++	check(probe.motions.size() >= 2, "vertical camera drag emits second motion")
++	check(probe.clicks.is_empty(), "a real drag does not click the UI")
++
++	# ------------------------------------------------------------- UI taps
++	probe.clicks.clear()
++	var ui_pos := Vector2(size.x * 0.5, size.y * 0.25)
++	_touch(5, ui_pos, true)
++	await get_tree().process_frame
++	_touch(5, ui_pos, false)
++	await get_tree().process_frame
++	check(probe.clicks.size() >= 2, "tap forwards press + release to the GUI")
++	if probe.clicks.size() >= 2:
++		check(probe.clicks[0][0] == true and probe.clicks[1][0] == false, "tap press order is press->release")
++
++	# ------------------------------------------------------- focus loss
++	_touch(6, joy_center + Vector2(joy_radius * 0.9, 0), true)
++	await get_tree().process_frame
++	check(Input.is_action_pressed("move_right"), "stick pressed again")
++	TouchUI.release_all()
++	await get_tree().process_frame
++	check(not Input.is_action_pressed("move_right"), "release_all() clears held actions (focus loss)")
++
++	# ------------------------------------------------------------ summary
++	print("")
++	print("touch checks: %d  failures: %d" % [checks, failures.size()])
++	for f in failures:
++		print("  - ", f)
++	if failures.is_empty():
++		print("TOUCH_TEST_OK")
++	get_tree().quit(0 if failures.is_empty() else 1)
+diff --git a/mobile/tests/touch_test.gd.uid b/mobile/tests/touch_test.gd.uid
+new file mode 100644
+index 0000000..e0b1a3b
+--- /dev/null
++++ b/mobile/tests/touch_test.gd.uid
+@@ -0,0 +1 @@
++uid://cxa3gaw4xobkj
+diff --git a/mobile/touch_ui.gd b/mobile/touch_ui.gd
+new file mode 100644
+index 0000000..1c51991
+--- /dev/null
++++ b/mobile/touch_ui.gd
+@@ -0,0 +1,295 @@
++extends Control
++## Mobile touch layer for GameDemo.
++##
++## Left half  : analog stick  -> move_left / move_right / move_up / move_down
++## Right half : drag          -> synthetic InputEventMouseMotion (rotates the
++##                              player camera through the game's normal input path)
++## Right side : action buttons -> jump / attack / swap_weapons / pause
++## Anywhere   : taps are forwarded to the GUI as synthetic mouse clicks so all
++##              the existing menus keep working with touch.
++##
++## The layer never touches the C# game code: it only writes to the InputMap and
++## to the input event queue, exactly like a keyboard / gamepad / mouse would.
++
++const DEAD_ZONE := 0.16
++const CAM_DRAG_SCALE := 1.0
++
++var _joy_index := -1
++var _joy_center := Vector2.ZERO
++var _joy_radius := 120.0
++var _knob := Vector2.ZERO
++var _joy_vector := Vector2.ZERO
++
++var _buttons: Array = []
++const _TAP_SLOP := 14.0
++const _TAP_TIME_MS := 400
++
++var _cam_index := -1
++var _cam_last := Vector2.ZERO
++var _cam_start := Vector2.ZERO
++var _cam_moved := false
++var _cam_press_time := 0
++var _ui_index := -1
++
++var _holding := {}  # action name -> true
++
++func _ready() -> void:
++	mouse_filter = Control.MOUSE_FILTER_IGNORE
++	set_anchors_preset(Control.PRESET_FULL_RECT)
++	_layout()
++	get_viewport().size_changed.connect(_layout)
++	set_process(true)
++	set_process_input(true)
++	set_process_unhandled_input(false)
++
++# ---------------------------------------------------------------- layout ----
++
++func _layout() -> void:
++	var size := get_viewport_rect().size
++	if size.x <= 0.0 or size.y <= 0.0:
++		return
++	var short := minf(size.x, size.y)
++	_joy_radius = short * 0.17
++	_joy_center = Vector2(size.x * 0.16, size.y * 0.73)
++	_buttons = [
++		{
++			"name": "JUMP", "action": "jump",
++			"center": Vector2(size.x * 0.855, size.y * 0.76),
++			"radius": short * 0.115, "index": -1,
++		},
++		{
++			"name": "HIT", "action": "attack",
++			"center": Vector2(size.x * 0.695, size.y * 0.86),
++			"radius": short * 0.09, "index": -1,
++		},
++		{
++			"name": "SWAP", "action": "swap_weapons",
++			"center": Vector2(size.x * 0.905, size.y * 0.545),
++			"radius": short * 0.075, "index": -1,
++		},
++		{
++			"name": "II", "action": "__pause",
++			"center": Vector2(size.x * 0.945, size.y * 0.10),
++			"radius": short * 0.058, "index": -1,
++		},
++	]
++	queue_redraw()
++
++func _in_game() -> bool:
++	return get_tree().get_first_node_in_group("game_scene") != null
++
++# ---------------------------------------------------------------- input ----
++
++func _input(event: InputEvent) -> void:
++	if event is InputEventScreenTouch:
++		if event.pressed:
++			_on_press(event.index, event.position)
++		else:
++			_on_release(event.index)
++		get_viewport().set_input_as_handled()
++	elif event is InputEventScreenDrag:
++		_on_drag(event.index, event.position, event.relative)
++		get_viewport().set_input_as_handled()
++
++func _on_press(index: int, pos: Vector2) -> void:
++	if _in_game():
++		if pos.distance_to(_joy_center) <= _joy_radius * 1.7:
++			_joy_index = index
++			_update_stick(pos)
++			return
++		for button in _buttons:
++			if pos.distance_to(button.center) <= button.radius * 1.25:
++				button.index = index
++				_press_action(button.action)
++				return
++		var size := get_viewport_rect().size
++		if pos.x > size.x * 0.42 and pos.y < size.y * 0.72:
++			_cam_index = index
++			_cam_last = pos
++			_cam_start = pos
++			_cam_moved = false
++			_cam_press_time = Time.get_ticks_msec()
++			queue_redraw()
++			return
++	# Everything else is a UI tap -> forward to the GUI as a mouse click.
++	_ui_index = index
++	_send_mouse_button(pos, true)
++
++func _on_drag(index: int, pos: Vector2, relative: Vector2) -> void:
++	if index == _joy_index:
++		_update_stick(pos)
++		return
++	if index == _cam_index:
++		if not _cam_moved and pos.distance_to(_cam_start) > _TAP_SLOP:
++			_cam_moved = true
++		# Drive the exact same code path a mouse uses.
++		var motion := InputEventMouseMotion.new()
++		motion.position = pos
++		motion.global_position = pos
++		motion.relative = Vector2(relative.x, relative.y) * CAM_DRAG_SCALE
++		motion.device = 0
++		Input.parse_input_event(motion)
++		_cam_last = pos
++		queue_redraw()
++		return
++	if index == _ui_index:
++		var motion := InputEventMouseMotion.new()
++		motion.position = pos
++		motion.global_position = pos
++		Input.parse_input_event(motion)
++
++func _on_release(index: int) -> void:
++	if index == _joy_index:
++		_joy_index = -1
++		_joy_vector = Vector2.ZERO
++		_knob = Vector2.ZERO
++		_release_move()
++		queue_redraw()
++		return
++	for button in _buttons:
++		if button.index == index:
++			button.index = -1
++			_release_action(button.action)
++			return
++	if index == _cam_index:
++		# A short press without dragging is a tap on the UI underneath
++		# (pause / win / death menus), so forward it as a click.
++		if not _cam_moved and Time.get_ticks_msec() - _cam_press_time < _TAP_TIME_MS:
++			_send_mouse_button(_cam_start, true)
++			_send_mouse_button(_cam_start, false)
++		_cam_index = -1
++		queue_redraw()
++		return
++	if index == _ui_index:
++		_ui_index = -1
++		_send_mouse_button(get_viewport().get_mouse_position(), false)
++
++func _send_mouse_button(pos: Vector2, pressed: bool) -> void:
++	var motion := InputEventMouseMotion.new()
++	motion.position = pos
++	motion.global_position = pos
++	Input.parse_input_event(motion)
++	var click := InputEventMouseButton.new()
++	click.button_index = MOUSE_BUTTON_LEFT
++	click.pressed = pressed
++	click.position = pos
++	click.global_position = pos
++	click.device = 0
++	Input.parse_input_event(click)
++
++# -------------------------------------------------------------- actions ----
++
++func _update_stick(pos: Vector2) -> void:
++	var v := (pos - _joy_center) / _joy_radius
++	if v.length() > 1.0:
++		v = v.normalized()
++	_joy_vector = v
++	_knob = v * _joy_radius
++	if absf(v.x) < DEAD_ZONE:
++		_release("move_left")
++		_release("move_right")
++	elif v.x > 0.0:
++		_press("move_right", (v.x - DEAD_ZONE) / (1.0 - DEAD_ZONE))
++		_release("move_left")
++	else:
++		_press("move_left", (-v.x - DEAD_ZONE) / (1.0 - DEAD_ZONE))
++		_release("move_right")
++	if absf(v.y) < DEAD_ZONE:
++		_release("move_up")
++		_release("move_down")
++	elif v.y > 0.0:
++		_press("move_down", (v.y - DEAD_ZONE) / (1.0 - DEAD_ZONE))
++		_release("move_up")
++	else:
++		_press("move_up", (-v.y - DEAD_ZONE) / (1.0 - DEAD_ZONE))
++		_release("move_down")
++	queue_redraw()
++
++func _release_move() -> void:
++	_release("move_left")
++	_release("move_right")
++	_release("move_up")
++	_release("move_down")
++
++func _press_action(action: String) -> void:
++	if action == "__pause":
++		# The game polls the built-in ui_cancel action for the pause button.
++		_press("ui_cancel", 1.0)
++		call_deferred("_release", "ui_cancel")
++		return
++	_press(action, 1.0)
++
++func _release_action(action: String) -> void:
++	if action == "__pause":
++		_release("ui_cancel")
++		return
++	_release(action)
++
++func _press(action: String, strength: float) -> void:
++	if not InputMap.has_action(action):
++		return
++	_holding[action] = true
++	Input.action_press(action, strength)
++
++func _release(action: String) -> void:
++	if _holding.get(action, false) or Input.is_action_pressed(action):
++		_holding.erase(action)
++		Input.action_release(action)
++
++func release_all() -> void:
++	_release_move()
++	for button in _buttons:
++		button.index = -1
++		_release_action(button.action)
++	_release("jump")
++	_release("attack")
++	_release("aim")
++	_release("swap_weapons")
++	_joy_index = -1
++	_cam_index = -1
++	_ui_index = -1
++	_knob = Vector2.ZERO
++	_joy_vector = Vector2.ZERO
++	queue_redraw()
++
++func _notification(what: int) -> void:
++	if what == NOTIFICATION_APPLICATION_FOCUS_OUT \
++	or what == NOTIFICATION_APPLICATION_PAUSED \
++	or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
++		release_all()
++
++# ----------------------------------------------------------------- draw ----
++
++func _process(_delta: float) -> void:
++	queue_redraw()
++
++func _draw() -> void:
++	if not _in_game():
++		return
++	var font := ThemeDB.fallback_font
++	if Net.is_multiplayer():
++		var status := "LAN: connected" if Net.peer_connected_flag else "LAN: waiting for the other phone..."
++		draw_string(
++			font, Vector2(26, 46), status, HORIZONTAL_ALIGNMENT_LEFT, -1, 22,
++			Color(0.55, 0.95, 0.7) if Net.peer_connected_flag else Color(0.95, 0.8, 0.4)
++		)
++	var line_col := Color(1, 1, 1, 0.28)
++	var fill_col := Color(1, 1, 1, 0.10)
++	# Analog stick
++	draw_circle(_joy_center, _joy_radius, Color(1, 1, 1, 0.07))
++	draw_arc(_joy_center, _joy_radius, 0, TAU, 64, line_col, 3.0, true)
++	draw_arc(_joy_center, _joy_radius * 0.42, 0, TAU, 48, Color(1, 1, 1, 0.16), 2.0, true)
++	draw_circle(_joy_center + _knob, _joy_radius * 0.36, Color(1, 1, 1, 0.30))
++	draw_arc(_joy_center + _knob, _joy_radius * 0.36, 0, TAU, 48, Color(1, 1, 1, 0.6), 2.0, true)
++	# Action buttons
++	for button in _buttons:
++		var pressed: bool = button.index >= 0
++		var col := Color(0.35, 0.85, 1.0, 0.35) if pressed else fill_col
++		draw_circle(button.center, button.radius, col)
++		draw_arc(button.center, button.radius, 0, TAU, 64, line_col, 3.0, true)
++		var text: String = button.name
++		var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22)
++		draw_string(
++			font, button.center - text_size * 0.5 + Vector2(0, text_size.y * 0.36),
++			text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, 0.85)
++		)
+diff --git a/mobile/touch_ui.gd.uid b/mobile/touch_ui.gd.uid
+new file mode 100644
+index 0000000..6115183
+--- /dev/null
++++ b/mobile/touch_ui.gd.uid
+@@ -0,0 +1 @@
++uid://degf2f0ohuski
+diff --git a/project.godot b/project.godot
+index ed09e42..5eeb0b4 100644
+--- a/project.godot
++++ b/project.godot
+@@ -11,10 +11,15 @@ config_version=5
+ [application]
+ 
+ config/name="GameDemo"
+-run/main_scene="res://src/Main.tscn"
++run/main_scene="res://mobile/Lobby.tscn"
+ config/features=PackedStringArray("4.7", "C#", "Mobile")
+ config/icon="res://icon.png"
+ 
++[autoload]
++
++Net="*res://mobile/net.gd"
++TouchUI="*res://mobile/TouchUI.tscn"
++
+ [debug]
+ 
+ settings/stdout/print_fps=true
+@@ -24,7 +29,9 @@ settings/stdout/print_fps=true
+ window/size/viewport_width=1920
+ window/size/viewport_height=1080
+ window/stretch/mode="canvas_items"
+-window/stretch/aspect="keep_height"
++window/stretch/aspect="expand"
++window/handheld/orientation=0
++window/energy_saving/keep_screen_on=true
+ window/vsync/vsync_mode=0
+ 
+ [dotnet]
+@@ -108,6 +115,10 @@ pause={
+ ]
+ }
+ 
++[input_devices]
++
++pointing/emulate_mouse_from_touch=false
++
+ [layer_names]
+ 
+ 3d_physics/layer_1="Entities"
+@@ -122,6 +133,10 @@ pause={
+ 
+ [rendering]
+ 
++renderer/rendering_method.mobile="mobile"
++
++textures/vram_compression/import_etc2_astc=true
++
+ lights_and_shadows/directional_shadow/size=1024
+ lights_and_shadows/directional_shadow/size.mobile=512
+ lights_and_shadows/directional_shadow/soft_shadow_filter_quality=0
+diff --git a/src/game/Game.tscn b/src/game/Game.tscn
+index 639a563..52f6407 100644
+--- a/src/game/Game.tscn
++++ b/src/game/Game.tscn
+@@ -9,8 +9,9 @@
+ [ext_resource type="PackedScene" uid="uid://bn84ofaaq4o80" path="res://src/death_menu/DeathMenu.tscn" id="7_35ldn"]
+ [ext_resource type="PackedScene" uid="uid://bthdrw6580hll" path="res://src/win_menu/WinMenu.tscn" id="8_ovoi6"]
+ [ext_resource type="PackedScene" uid="uid://conmng5ejji6f" path="res://src/pause_menu/PauseMenu.tscn" id="9_yxma7"]
++[ext_resource type="Script" path="res://mobile/net_sync.gd" id="10_netsync"]
+ 
+-[node name="Game" type="Node3D" unique_id=1639502299]
++[node name="Game" type="Node3D" groups=["game_scene"] unique_id=1639502299]
+ process_mode = 3
+ script = ExtResource("1_17mmo")
+ 
+@@ -54,3 +55,6 @@ unique_name_in_owner = true
+ visible = false
+ 
+ [editable path="InGameUi"]
++
++[node name="NetSync" type="Node" parent="."]
++script = ExtResource("10_netsync")
