@@ -22,6 +22,9 @@ signal connected_ok
 signal connection_error(message: String)
 signal host_left
 
+var watchdog_armed := false
+var diag_requested := false
+var _watchdog_t := 0.0
 var _udp_send: PacketPeerUDP
 var _udp_recv: PacketPeerUDP
 var _advertise_accum := 0.0
@@ -108,7 +111,24 @@ func close() -> void:
 	peer_connected_flag = false
 	mode = Mode.SOLO
 
+## Watchdog: if the game scene is loaded but never becomes visible (for example
+## because the C#/.NET side failed to run on this device), go back to the lobby
+## and show the diagnostics instead of leaving the player on a black screen.
+func arm_watchdog() -> void:
+	watchdog_armed = true
+	_watchdog_t = 0.0
+
 func _process(delta: float) -> void:
+	if watchdog_armed:
+		_watchdog_t += delta
+		if _watchdog_t > 12.0:
+			watchdog_armed = false
+			var scene := get_tree().current_scene
+			if scene != null and scene.name == "App":
+				var blank := scene.find_child("BlankScreen", true, false)
+				if blank is CanvasItem and (blank as CanvasItem).visible:
+					diag_requested = true
+					get_tree().change_scene_to_file("res://mobile/Lobby.tscn")
 	if mode == Mode.HOST and _udp_send != null:
 		_advertise_accum += delta
 		if _advertise_accum >= 1.0:
